@@ -56,12 +56,11 @@ class GroupGuidanceEnv(gym.Env):
         # 角度を取得
         theta = action[0]
 
+        # 現在の位置の更新
         dx = self.r * np.cos(np.radians(theta))
         dy = self.r + np.sin(np.radians(theta))
-
-         # 現在の位置の更新
         self.agent_position += np.array([dx, dy])
-
+        
         # 軌跡用にagentの位置を追加
         self.agent_trajectory.append(self.agent_position.copy())
 
