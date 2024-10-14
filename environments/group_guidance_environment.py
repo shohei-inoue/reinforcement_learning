@@ -34,7 +34,7 @@ class GroupGuidanceEnv(gym.Env):
             dtype=np.float32
         )
         self.reward_range = (0, 1) # TODO 報酬幅仮置き
-        # TODO 1.外部入力から決定に変更するかも?
+        # TODO 1.初期位置, 領域半径は外部入力から決定に変更するかも?
         self.agent_position = np.array([0.0, 0.0]) # 初期位置
         self.r = 10 # outer_boundary(frontier_based)
         self.agent_trajectory = [self.agent_position.copy()] # agentの軌跡を保存(プロット用)
@@ -60,7 +60,7 @@ class GroupGuidanceEnv(gym.Env):
         dx = self.r * np.cos(np.radians(theta))
         dy = self.r + np.sin(np.radians(theta))
         self.agent_position += np.array([dx, dy])
-        
+
         # 軌跡用にagentの位置を追加
         self.agent_trajectory.append(self.agent_position.copy())
 
@@ -142,6 +142,18 @@ class GroupGuidanceEnv(gym.Env):
         self.map[:, self.ENV_WIDTH - 1] = 1 # 右辺
 
         # TODO 他の障害物の生成
+        self.map[20, :20] = 1
+        self.map[30:, 40] = 1
+        self.map[:40, 70] = 1
+        self.map[20:40, 100] = 1
+    
+
+    def _close(self):
+        pass
+
+
+    def _seed(self, seed=None):
+        pass
 
 
 
