@@ -1,10 +1,8 @@
 import gym
 import numpy as np
-import math
 import matplotlib.pyplot as plt
 from matplotlib.patches import Circle
 
-# TODO 座標は治ったが貫通する
 
 class GroupGuidanceEnv(gym.Env):
     """
@@ -141,7 +139,7 @@ class GroupGuidanceEnv(gym.Env):
         plt.imshow(
             self.map,
             cmap='gray_r', 
-            origin='upper',
+            origin='lower',
             extent=[0, self.ENV_WIDTH, 0, self.ENV_HEIGHT]
             )
         # 探査中心位置の描画
@@ -195,7 +193,7 @@ class GroupGuidanceEnv(gym.Env):
         self.map[:, self.ENV_WIDTH - 1] = 1 # 右辺
 
         # TODO 他の障害物の生成
-        self.map[40, :20] = 1
+        self.map[20, :20] = 1
         self.map[30:, 40] = 1
         self.map[:40, 70] = 1
         self.map[20:40, 100] = 1
