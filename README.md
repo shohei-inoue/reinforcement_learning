@@ -23,6 +23,10 @@ reinforcement_learning
     |       | 
     |       | - group_guidance_environment.py
     |
+    | - agents
+    |       |
+    |       | - group_guidance_agent.py
+    |
     | - gitignore.txt
     | - README.md
 ```
