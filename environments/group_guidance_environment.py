@@ -1,7 +1,11 @@
 import gym
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.patches import Circle
+import imageio
+import os
+from datetime import datetime
 
 
 class GroupGuidanceEnv(gym.Env):
@@ -13,8 +17,13 @@ class GroupGuidanceEnv(gym.Env):
     # 描画サイズ 
     ENV_HEIGHT = 60
     ENV_WIDTH = 150
+    # 探査パラメータ
+    OUTER_BOUNDARY = 10.0
+    INNER_BOUNDARY = 0.0
+    MEAN = 0.0
+    VARIANCE = 10.0
 
-    def __init__(self):
+    def __init__(self, init_position: np.array):
         """
         GroupGuidanceEnvのコンストラクタ
         行動空間：θ(0~360)
@@ -35,22 +44,23 @@ class GroupGuidanceEnv(gym.Env):
             dtype=np.float32
         )
         self.reward_range = (0, 1) # TODO 報酬幅仮置き
-        # TODO 1.初期位置, 領域半径は外部入力から決定に変更するかも?
-        self.agent_position = np.array([5.0, 5.0]) # 初期位置
-        self.r = 10 # outer_boundary(frontier_based)
+        self.init_position = init_position  # 初期位置
+        self.agent_position = self.init_position
         self.agent_trajectory = [self.agent_position.copy()] # agentの軌跡を保存(プロット用)
+        self.frames = [] # シミュレーション保存用
     
 
-    def reset(self):
+    def reset(self, add_data: pd.DataFrame | None):
         """
         初期化関数
         """
-        # TODO 1.外部入力から決定に変更するかも?
-        self.agent_position = np.array([5.0, 5.0])
-
+        self.agent_position = self.init_position
         # 描画を初期化
         self.agent_trajectory = [self.agent_position.copy()]
-        self.render()
+        if add_data is not None:
+            self.render(add_data)
+        else:
+            self.render()
 
         return self.agent_position
     
@@ -63,8 +73,8 @@ class GroupGuidanceEnv(gym.Env):
         theta = action[0]
 
         # 現在の位置の更新
-        dx = self.r * np.cos(np.radians(theta))
-        dy = self.r * np.sin(np.radians(theta))
+        dx = self.OUTER_BOUNDARY * np.cos(np.radians(theta))
+        dy = self.OUTER_BOUNDARY * np.sin(np.radians(theta))
         self.agent_position = self.next_position(dy, dx)
 
         # 軌跡用にagentの位置を追加
@@ -129,12 +139,13 @@ class GroupGuidanceEnv(gym.Env):
 
     
 
-    def render(self, mode='rgb_array'):
+    def render(self, add_data: list[pd.DataFrame] | None = None, save_frames = False, mode = 'rgb_array'):
         """
         レンダリング処理
         """
+        plt.gcf().clf()
          # 図のサイズを指定
-        plt.figure(figsize=(10, 4))
+        # plt.figure(figsize=(10, 4))
          # 環境のマップを描画
         plt.imshow(
             self.map,
@@ -146,7 +157,7 @@ class GroupGuidanceEnv(gym.Env):
         plt.scatter(
             x=self.agent_position[1],
             y=self.agent_position[0],
-            color='red',
+            color='blue',
             s=100,
             label='Explore Center'
             )
@@ -161,13 +172,40 @@ class GroupGuidanceEnv(gym.Env):
          # 探査領域を表示
         explore_area = Circle(
             (self.agent_position[1], self.agent_position[0]),
-            self.r, 
+            self.OUTER_BOUNDARY, 
             color='black',
             fill=False,
             linewidth=1,
             label='Wall or Obstacle'
             )
         plt.gca().add_patch(explore_area)
+
+        # REDの描画
+        if add_data is not None:
+            for data in add_data:
+                plt.scatter(
+                    x = data['x'].iloc[-1],
+                    y = data['y'].iloc[-1],
+                    color='red',
+                    s=10,
+                    # label='sub robots'
+                )
+                plt.plot(
+                    data['x'],
+                    data['y'],
+                    color='gray',
+                    linewidth='0.5',
+                    alpha=0.5
+                    # label='sub robots trajectory'
+                )
+                # plt.scatter(
+                #     x = data['x'],
+                #     y = data['y'],
+                #     color='gray',
+                #     s=2,
+                #     alpha=0.3
+                #     # label='sub robots'
+                # )
         
         # 描画設定
         plt.xlim(0, self.ENV_WIDTH)
@@ -176,10 +214,36 @@ class GroupGuidanceEnv(gym.Env):
         plt.xlabel('X')
         plt.ylabel('Y')
         plt.grid(False)
-        plt.legend()
+        if add_data is None:
+            plt.legend()
 
-        plt.show()
+        plt.draw()
+        plt.pause(0.001)
+
+        if save_frames:
+            filename = f"frame_{len(self.frames)}.png"
+            plt.savefig(filename)
+            self.frames.append(filename)
+            print(f"frame named: {filename}")
         # print("Agent position: {}".format(self.agent_position))
+
+
+    def save_gif(self, episode, gif_name=None):
+        """
+        保存したフレームをGIFに変換
+        """
+        now = datetime.now()
+        date_time_str = now.strftime("%Y%m%d_%H%M%S")
+        if gif_name is None:
+            gif_name = f"{date_time_str}_episode{episode}.gif"
+
+        images = [imageio.imread(frame) for frame in self.frames]
+        imageio.mimsave(f"gif/{gif_name}", images, duration=0.1)
+
+        # 一時ファイルの削除
+        for frame in self.frames:
+            os.remove(frame)
+        self.frames = []
 
     
     def generate_obstacles(self):
