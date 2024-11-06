@@ -161,6 +161,8 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 
-# add
-*.gif
+# Ignore all Jupyter notebook files
 *.ipynb
+
+# Ignore all GIF files
+*.gif
