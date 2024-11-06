@@ -23,34 +23,34 @@ class Red():
             self,
             id: str,
             env: GroupGuidanceEnv,
-            agent_position,
-            x: float = 0.0,
-            y: float = 0.0, 
+            agent_position: np.array,
+            x: float,
+            y: float,
             step: int = 0, 
             amount_of_movement: float = 0.0, 
             direction_angle: float = 0.0, 
             collision_flag: bool = False, 
             boids_flag: int = 0, 
             estimated_probability: float = 0.0, 
-            data: pd.DataFrame = pd.DataFrame(),):
+            ):
         """
         REDのコンストラクタ
         """
-        self.id = id
-        self.env = env
-        self.agent_position = agent_position
-        self.step = step
-        self.x = x
-        self.y = y
-        self.point = np.array([self.y, self.x])
-        self.amount_of_movement = amount_of_movement
-        self.direction_angle = direction_angle
-        self.distance = np.linalg.norm(self.point - agent_position)
-        self.azimuth = self.azimuth_adjustment(agent_position)
-        self.collision_flag = collision_flag
-        self.boids_flag = boids_flag
-        self.estimated_probability = estimated_probability
-        self.data = data
+        self.id: str                        = id
+        self.env: GroupGuidanceEnv          = env
+        self.agent_position: np.array       = agent_position
+        self.step: int                      = step
+        self.x: float                       = x
+        self.y: float                       = y
+        self.point: np.array                = np.array([self.y, self.x])
+        self.amount_of_movement: float      = amount_of_movement
+        self.direction_angle: float         = direction_angle
+        self.distance: float                = np.linalg.norm(self.point - agent_position)
+        self.azimuth: float                 = self.azimuth_adjustment()
+        self.collision_flag: bool           = collision_flag
+        self.boids_flag: int                = boids_flag
+        self.estimated_probability: float   = estimated_probability
+        self.data = self.get_arguments()
     
 
     def get_arguments(self):
@@ -59,24 +59,26 @@ class Red():
         """
         return pd.DataFrame({'id': [self.id],
                              'step': [self.step], 
+                             'agent_position': [self.agent_position],
                              'x': [self.x], 
                              'y': [self.y], 
                              'point': [self.point], 
                              'amount_of_movement': [self.amount_of_movement], 
                              'direction_angle': [self.direction_angle], 
+                             'distance': [self.distance], 
+                             'azimuth': [self.azimuth],
                              'collision_flag': [self.collision_flag],
                              'boids_flag': [self.boids_flag],
                              'estimated_probability': [self.estimated_probability],
-                             'distance': [None], 
-                             'azimuth': [None],
                              })
     
 
-    def azimuth_adjustment(self):
+    def azimuth_adjustment(self) -> float:
         """
+        TODO azimuthおかしいから治す
         探査中心の方向角を計算
         """
-        azimuth = 0.0
+        azimuth: float = 0.0
         if self.x != self.agent_position[1]:
             vec_d = np.array(self.point - self.agent_position)
             vec_x = np.array([0, self.x - self.agent_position[1]]) # TODO
@@ -92,11 +94,21 @@ class Red():
         else:
             if self.y - self.agent_position[0] < 0:
                 azimuth = np.rad2deg(2.0 * math.pi) - azimuth
+
+        # # ロボットからエージェントへのベクトルを計算
+        # dy = self.agent_position[0] - self.y  # y方向の差
+        # dx = self.agent_position[1] - self.x  # x方向の差
+
+        # # 偏角を計算 (度単位)
+        # azimuth = np.degrees(np.arctan2(dy, dx))
+
+        # # 正規化して0~360度に変換
+        # azimuth = (azimuth + 360) % 360
         
         return azimuth
 
 
-    def avoidance_behavior(self):
+    def avoidance_behavior(self) -> np.array:
         """
         障害物回避行動
         """
@@ -108,7 +120,7 @@ class Red():
         return prediction_point
     
 
-    def forward_behavior(self, dy, dx):
+    def forward_behavior(self, dy, dx) -> np.array:
         """
         直進行動処理
         """
@@ -117,8 +129,8 @@ class Red():
 
         for i in range(1, SAMPLING_NUM + 1):
             intermediate_position = np.array([
-                self.agent_position[0] * (dy * i / SAMPLING_NUM),
-                self.agent_position[1] * (dx * i / SAMPLING_NUM)
+                self.point[0] + (dy * i / SAMPLING_NUM),
+                self.point[1] + (dx * i / SAMPLING_NUM)
             ])
 
             if (0 < intermediate_position[0] < self.env.ENV_HEIGHT) and (0 < intermediate_position[1] < self.env.ENV_WIDTH):
@@ -126,14 +138,14 @@ class Red():
                 map_x = int(intermediate_position[1])
 
                 if self.env.map[map_y, map_x] == 1:
-                    print(f"Obstacle collided at : {intermediate_position}")
+                    # print(f"Obstacle collided at : {intermediate_position}")
 
                     # 障害物に衝突する事前位置を計算
                     collision_position = intermediate_position
-                    direction_vector = collision_position - self.agent_position
+                    direction_vector = collision_position - self.point
                     norm_direction_vector = np.linalg.norm(direction_vector)
 
-                    stop_position = self.agent_position + (direction_vector / norm_direction_vector) * (norm_direction_vector - SAFE_DISTANCE)
+                    stop_position = self.point + (direction_vector / norm_direction_vector) * (norm_direction_vector - SAFE_DISTANCE)
 
                     self.collision_flag = True
 
@@ -143,13 +155,14 @@ class Red():
         
         self.collision_flag = False
 
-        return self.agent_position + np.array([dy, dx])
+        return self.point + np.array([dy, dx])
     
 
-    def boids_judgement(self):
+    def boids_judgement(self) -> None:
         """
         boids行動を行うか判断する
         """
+        self.distance = np.linalg.norm(self.point - self.agent_position)
         if self.distance > self.env.OUTER_BOUNDARY:
             self.boids_flag = 1
         elif self.distance < self.env.INNER_BOUNDARY:
@@ -158,13 +171,13 @@ class Red():
             self.boids_flag = 0
     
 
-    def boids_behavior(self):
+    def boids_behavior(self) -> np.array:
         """
         boids行動
         """
         self.direction_angle = self.azimuth
         if self.boids_flag == 1:
-            if self.y - self.agent_position[0]:
+            if self.y - self.agent_position[0] >= 0:
                 self.direction_angle += np.rad2deg(math.pi)
             else:
                 self.direction_angle -= np.rad2deg(math.pi)
@@ -176,11 +189,11 @@ class Red():
         return prediction_point
     
 
-    def rejection_decision(self):
+    def rejection_decision(self) -> np.array:
         """
         メトロポリス法による棄却決定
         """
-        def distribution(distance, mean, variance):
+        def distribution(distance, mean, variance) -> float:
             """
             正規分布
             """
@@ -200,10 +213,15 @@ class Red():
                 self.direction_angle = direction_angle
                 return prediction_point
             else:
-                continue
+                if estimated_probability / self.estimated_probability > np.random.rand():
+                    self.estimated_probability = estimated_probability
+                    self.direction_angle = direction_angle
+                    return prediction_point
+                else:
+                    continue
 
     
-    def step_motion(self):
+    def step_motion(self) -> None:
         """
         行動制御
         """
@@ -228,3 +246,15 @@ class Red():
         self.step += 1
 
         self.data = pd.concat([self.data, self.get_arguments()])
+    
+
+    def change_agent_state(self, env, agent_position):
+        """エージェントの状態が変化した場合"""
+        # self.env = env
+
+        self.agent_position = agent_position
+
+
+
+    def __str__(self):
+        return f'red[{self.id}], step:{self.step},position:{self.point}'
